@@ -254,11 +254,11 @@ def write_toehold_file(toehold_file, strands, toeholds, n_th):
         Nothing
     """
     line = 'sequence {} = {} # species {}\n'
-    f = open(toehold_file, 'w')
     th_names = [th for strand in strands for th in strand.get_ths()]
     th_names = sorted(list(set(th_names)))
     th_data = [(th, ', '.join([strand.name for strand in strands if th in strand.get_ths()]))
                     for th in th_names]
+    f = open(toehold_file, 'w')
     for data, seq in zip(th_data, toeholds):
         constraint = line.format(data[0], seq.upper(), data[1])
         f.write(constraint)
@@ -472,8 +472,6 @@ def generate_seqs(basename,
         fixed_file = basename + ".fixed"
 
     # Make toeholds
-    n_species = len(strands)
-    signal_names = [ s.name for s in strands ]
     tdomains = []
     for strand in strands:
         tdomains += strand.get_ths()
