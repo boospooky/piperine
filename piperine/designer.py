@@ -415,7 +415,8 @@ def generate_seqs(basename,
                   seq_file=None,
                   fixed_file=None,
                   save_file=None,
-                  strands_file=None):
+                  strands_file=None,
+                  tempname=None):
     """ Produce sequences for a scheme
 
     This function accepts a base file name, a list of gate objects, a list of
@@ -445,6 +446,8 @@ def generate_seqs(basename,
     Returns:
         toeholds:
     """
+    if type(e_module) is str:
+        e_module = importlib.import_module('.' + e_module, 'piperine')
 
     # Prepare filenames
     if system_file is None:
@@ -470,6 +473,8 @@ def generate_seqs(basename,
             strands_file = basename + "_strands.txt"
     if fixed_file is None:
         fixed_file = basename + ".fixed"
+    if tempname is None:
+        tempname = basename
 
     # Make toeholds
     tdomains = []
@@ -495,7 +500,7 @@ def generate_seqs(basename,
 
     # Generate sequences
     call_design(basename, pil_file, mfe_file, verbose=False,
-                extra_pars=extra_pars, cleanup=False)
+                extra_pars=extra_pars, cleanup=False, tempname=tempname)
     # "Finish" the sequence generation
     call_finish(basename, savename=save_file, designname=mfe_file, \
                 seqname=seq_file, strandsname=strands_file, run_kin=False)
@@ -641,6 +646,51 @@ def selection_wrapper(scores, reportfile = 'score_report.txt'):
         sys.stdout = stdout
     return winner
 
+# Multithreading support
+from multiprocessing import Pool
+def rep(i, args):
+    from . import tdm
+    (basename, gates, strands, design_params, n_th, thold_l, thold_e,
+        e_dev, m_spurious, e_module, extra_pars, quick, includes) = args
+    testname = basename + str(i) + '.txt'
+    try:
+        toeholds = generate_seqs(basename,
+                                 gates,
+                                 strands,
+                                 design_params,
+                                 n_th=n_th,
+                                 thold_l=thold_l,
+                                 thold_e=thold_e,
+                                 e_dev=e_dev,
+                                 m_spurious=m_spurious,
+                                 e_module=e_module,
+                                 strands_file=testname,
+                                 extra_pars=extra_pars,
+                                 pil_file=basename+str(i)+'.pil',
+                                 mfe_file=basename+str(i)+'.mfe',
+                                 seq_file=basename+str(i)+'.seq',
+                                 fixed_file=basename+str(i)+'.fixed',
+                                 save_file=basename+str(i)+'.save',
+                                 tempname=basename+str(i))
+
+        scores, names = tdm.EvalCurrent(basename,
+                                        gates,
+                                        strands,
+                                        testname=testname,
+                                        seq_file=basename+str(i)+'.seq',
+                                        mfe_file=basename+str(i)+'.mfe',
+                                        compile_params=design_params,
+                                        quick=quick,
+                                        includes=includes,
+                                        energetics_module=e_module,
+                                        targetdG = thold_e)
+        scores = [i] + scores
+        return scores
+    except KeyError as e:
+        print('Error!')
+        print(e)
+        return (gates, strands, e)
+
 def run_designer(basename=small_crn[:-4],
                  reps=1,
                  design_params=(7, 15, 2),
@@ -686,8 +736,6 @@ def run_designer(basename=small_crn[:-4],
     # If module inputs are strings, import them
     if type(trans_module) is str:
         trans_module = importlib.import_module('.' + trans_module, 'piperine')
-    if type(e_module) is str:
-        e_module = importlib.import_module('.' + e_module, 'piperine')
     #
     if quick:
         extra_pars = "imax=-1 quiet=TRUE"
@@ -701,40 +749,21 @@ def run_designer(basename=small_crn[:-4],
         generate_scheme(basename, design_params, trans_module)
 
     if reps >= 1:
-        scoreslist = []
-        for i in range(reps):
-            testname = basename + str(i) + '.txt'
-            try:
-                toeholds = generate_seqs(basename,
-                                         gates,
-                                         strands,
-                                         design_params,
-                                         n_th=trans_module.n_th,
-                                         thold_l=thold_l,
-                                         thold_e=thold_e,
-                                         e_dev=e_dev,
-                                         m_spurious=m_spurious,
-                                         e_module=e_module,
-                                         strands_file=testname,
-                                         extra_pars=extra_pars)
-
-                scores, score_names = tdm.EvalCurrent(basename,
-                                                      gates,
-                                                      strands,
-                                                      testname=testname,
-                                                      compile_params=design_params,
-                                                      quick=quick,
-                                                      includes=includes,
-                                                      energetics_module=e_module,
-                                                      targetdG = thold_e)
-                scores = [i] + scores
-                scoreslist.append(scores)
-            except KeyError as e:
-                print('Error!')
-                print(e)
-                return (gates, strands, e)
-        score_names = ['Set Index'] + score_names
-        scores = [score_names] + scoreslist
+        with Pool() as p:
+            vars = (basename, gates, strands, design_params, trans_module.n_th, thold_l, thold_e,
+                e_dev, m_spurious, e_module, extra_pars, quick, includes)
+            args = [(i, vars) for i in range(reps)]
+            scoreslist = list(p.starmap(rep, args))
+        _, names = tdm.EvalCurrent(basename, gates,
+                                             strands,
+                                             testname=None,
+                                             compile_params=design_params,
+                                             quick=True,
+                                             includes=includes,
+                                             energetics_module=e_module,
+                                             targetdG = thold_e)
+        score_names = ['Set Index'] + names
+        scores = score_names + scoreslist
         if reps > 2:
             winner = selection_wrapper(scores, reportfile=basename+'_score_report.txt')
         else:

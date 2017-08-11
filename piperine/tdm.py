@@ -2,6 +2,7 @@ from __future__ import division, print_function
 
 import os
 import sys
+import importlib
 from tempfile import mkstemp, mkdtemp
 
 nupackpath = os.environ['NUPACKHOME']+'/bin/'
@@ -182,6 +183,9 @@ def EvalCurrent(basename, gates, strands, compile_params=(7, 15, 2),
                 header=True, testname=None, seq_file=None, mfe_file=None,
                 quick=False, targetdG=7.7, energetics_module=energyfuncs_james,
                 includes=None, clean=True):
+    if type(energetics_module) is str:
+        energetics_module = importlib.import_module('.' + energetics_module, 'piperine')
+
     if not testname:
         testname = basename
     if not seq_file:
