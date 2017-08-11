@@ -649,7 +649,10 @@ def selection_wrapper(scores, reportfile = 'score_report.txt'):
 # Multithreading support
 from multiprocessing import Pool
 def rep(i, args):
+    import time
     from . import tdm
+    time.sleep(i)
+
     (basename, gates, strands, design_params, n_th, thold_l, thold_e,
         e_dev, m_spurious, e_module, extra_pars, quick, includes) = args
     testname = basename + str(i) + '.txt'
