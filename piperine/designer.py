@@ -649,9 +649,10 @@ def selection_wrapper(scores, reportfile = 'score_report.txt'):
 # Multithreading support
 from multiprocessing import Pool
 def rep(i, args):
-    import time
+    import time, numpy as np
     from . import tdm
     time.sleep(i)
+    np.random.seed()
 
     (basename, gates, strands, design_params, n_th, thold_l, thold_e,
         e_dev, m_spurious, e_module, extra_pars, quick, includes) = args
@@ -766,7 +767,7 @@ def run_designer(basename=small_crn[:-4],
                                              energetics_module=e_module,
                                              targetdG = thold_e)
         score_names = ['Set Index'] + names
-        scores = score_names + scoreslist
+        scores = [score_names] + scoreslist
         if reps > 2:
             winner = selection_wrapper(scores, reportfile=basename+'_score_report.txt')
         else:

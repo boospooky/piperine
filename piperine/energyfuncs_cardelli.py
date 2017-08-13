@@ -85,6 +85,15 @@ class energyfuncs:
         nndG_external = np.sum(self.nndG[tops_external], 1)
         return nndG_external - self.taildG - self.initdG
 
+    def th_external_dG(self, seqs):
+        # Make a boolean vector representing which toeholds' external 3' context dG
+        # is further from the target dG than than their external 5' context dG
+        dG_external3 = self.th_external_3_dG(seqs)
+        dG_external5 = self.th_external_5_dG(seqs)
+        external_further_bool = np.abs(dG_external3 - self.targetdG) >\
+                                np.abs(dG_external5 - self.targetdG)
+        return np.choose(external_further_bool, [dG_external5, dG_external3])
+
     def th_internal_dG(self, seqs):
         # Convert nearest-neighbor stacks to dG-table lookup indices
         # Sum up and return the near-neighbor energy contributions
@@ -97,15 +106,11 @@ class energyfuncs:
     def matching_uniform(self, seqs):
         # Make a boolean vector representing which toeholds' external context dG
         # is further from the target dG than than their internal context dG
-        dG_3_external = self.th_external_3_dG(seqs)
-        dG_5_external = self.th_external_5_dG(seqs)
+        dG_external = self.th_external_dG(seqs)
         dG_internal = self.th_internal_dG(seqs)
-        external_further_bool = np.abs(dG_5_external - self.targetdG) >\
-                                np.abs(dG_3_external - self.targetdG)
-        dG_external_max = np.choose(external_further_bool, [dG_3_external, dG_5_external])
-        further_bool = np.abs(dG_external_max - self.targetdG) >\
-                       np.abs(dG_internal - self.targetdG)
-        return np.choose(further_bool, [dG_internal, dG_external_max])
+        external_further_bool = np.abs(dG_external - self.targetdG) >\
+                                np.abs(dG_internal - self.targetdG)
+        return np.choose(external_further_bool, [dG_internal, dG_external])
 
     def uniform_loopmismatch(self, seqs1, seqs2):
         if seqs1.shape != seqs2.shape:
