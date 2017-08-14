@@ -489,6 +489,8 @@ def generate_seqs(basename,
                                e_dev=e_dev,
                                m_spurious=m_spurious,
                                e_module=e_module)
+    import numpy as np
+    toeholds = np.random.choice(toeholds, len(toeholds), replace=False)
 
     # Write the fixed file for the toehold sequences and compile the sys file to PIL
     write_toehold_file(fixed_file, strands, toeholds, n_th)
@@ -651,7 +653,6 @@ from multiprocessing import Pool
 def rep(i, args):
     import time, numpy as np
     from . import tdm
-    time.sleep(i)
     np.random.seed()
 
     (basename, gates, strands, design_params, n_th, thold_l, thold_e,
